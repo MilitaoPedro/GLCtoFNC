@@ -13,14 +13,27 @@ class GLC{
         // Arquivo de entrada
         std::ifstream glcArquivo;
         // Arquivo de saída
+
         std::ofstream fncArquivo;
     
     public: 
-        void adicionarRegra(const std::string& variavel, const std::string& regra);
+        void adicionarRegra
+        (
+            const std::string& variavel, 
+            const std::string& regra
+        );
         void lerGramatica();
         void removeRecursividadeS();
         void imprimirGramatica();
         void removeLambda();
+        void combinacoesSemAnulavel
+        (
+            const std::string& regra, 
+            const std::set<std::string>& nullables, 
+            std::set<std::string>& regraAtualizadas,
+            const std::string& varAtual
+        );
+        void removeChainRules();
         GLC(const std::string& nomeArquivoGNC);
 };
     GLC::GLC(const std::string& nomeArquivoGNC){
@@ -34,9 +47,9 @@ class GLC{
         }
 
         lerGramatica();
-        removeRecursividadeS();
-        removeLambda();
-
+        // removeRecursividadeS();
+        // removeLambda();
+        removeChainRules();
         glcArquivo.close();
     }
 
@@ -149,24 +162,100 @@ class GLC{
         }
         std::cout << "}"; 
 
+        int anulaveisCount = 0;
+
         // Remover regras lambda e atualizar produções
-        for (auto& entry : glcHash) {
-            std::vector<std::string> updatedRules;
-            for (const auto& rule : entry.second) {
-                if (rule != ".") {
-                    updatedRules.push_back(rule);
+        for (auto& linhaVariavel : glcHash) {
+            std::set<std::string> regraAtualizadasSet;
+            for (const auto& regra : linhaVariavel.second) {
+                combinacoesSemAnulavel(regra, nullables, regraAtualizadasSet, linhaVariavel.first);
+            }
+            // Converter o conjunto de volta para um vetor
+            linhaVariavel.second.assign(regraAtualizadasSet.begin(), regraAtualizadasSet.end());
+        }
+
+        imprimirGramatica();
+    }
+
+    void GLC::combinacoesSemAnulavel(const std::string& regra, const std::set<std::string>& nullables, std::set<std::string>& regraAtualizadas, const std::string& varAtual) {
+        size_t n = regra.size();
+        std::set<std::string> novasRegras;
+
+        // Se a regra é apenas ".", não adiciona nada
+        if (regra == "." && varAtual != "S") {
+            return;
+        }
+
+        // Comece com a regra original
+        novasRegras.insert(regra);
+
+        // Para cada posição na regra, verifique se é anulável e crie novas regras removendo-a
+        for (size_t i = 0; i < n; ++i) {
+            std::string symbol(1, regra[i]);
+            if (nullables.find(symbol) != nullables.end()) {
+                std::set<std::string> tempRegras;
+                for (const auto& r : novasRegras) {
+                    // Certifique-se de que estamos dentro dos limites da string
+                    std::string novaRegra = r.substr(0, i);
+                    if (i + 1 < r.size()) {
+                        novaRegra += r.substr(i + 1);
+                    }
+                    // Adiciona a nova regra, mesmo se estiver vazia
+                    if (r.empty() && varAtual == "S") {
+                        novasRegras.insert("."); // Adiciona a regra vazia representada por "." apenas se for a variável inicial
+                    }
+                    tempRegras.insert(novaRegra);
                 }
-                for (size_t i = 0; i < rule.size(); ++i) {
-                    if (nullables.find(std::string(1, rule[i])) != nullables.end()) {
-                        std::string newRule = rule.substr(0, i) + rule.substr(i + 1);
-                        if (!newRule.empty() && std::find(updatedRules.begin(), updatedRules.end(), newRule) == updatedRules.end()) {
-                            updatedRules.push_back(newRule);
-                        }
+                // Adiciona as regras temporárias a novasRegras
+                novasRegras.insert(tempRegras.begin(), tempRegras.end());
+            }
+        }
+
+        // Adicione todas as novas regras geradas ao conjunto para eliminar duplicatas
+        for (const auto& regra : novasRegras) {
+            if(!regra.empty()) 
+                regraAtualizadas.insert(regra);
+        }
+
+        // Para depuração, imprimir todas as regras geradas
+        for (const auto& r : regraAtualizadas) {
+            std::cout << " -> " << r;
+        }
+    }
+
+    void GLC::removeChainRules() {
+        for (auto& entry : glcHash) {
+            const std::string& variavel = entry.first;
+            std::set<std::string> visitados;
+            std::set<std::string> novasRegras; // Usar set para evitar duplicatas
+
+            std::vector<std::string> fila;
+            fila.push_back(variavel);
+
+            while (!fila.empty()) {
+                std::string atual = fila.back();
+                fila.pop_back();
+
+                if (visitados.find(atual) != visitados.end()) {
+                    continue;
+                }
+                visitados.insert(atual);
+
+                for (const auto& regra : glcHash[atual]) {
+                    if (regra.size() == 1 && isupper(regra[0])) {
+                        fila.push_back(regra);
+                    } else if(regra.empty() && entry.first == "S"){ // Não adicionar regras vazias ou lambda
+                        novasRegras.insert(".");
+                    } else if (!regra.empty()) {
+                        novasRegras.insert(regra);
                     }
                 }
             }
-            entry.second = updatedRules;
+
+            // Atualizar as regras da variável com as novas regras sem duplicatas
+            entry.second.assign(novasRegras.begin(), novasRegras.end());
         }
+        imprimirGramatica();
     }
 
     void GLC::imprimirGramatica(){
