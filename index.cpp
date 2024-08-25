@@ -262,7 +262,7 @@ void GLC::removeChainRules() {
     for (auto& linhaVariavel : glcHash) {
         const std::string& variavel = linhaVariavel.first;
         std::set<std::string> visitados;
-        std::set<std::string> novasRegras; // Usar set para evitar duplicações
+        std::set<std::string> novasRegras; // Usa set para evitar duplicações
 
         std::vector<std::string> fila;
         fila.push_back(variavel);
