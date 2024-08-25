@@ -556,12 +556,45 @@ void GLC::imprimirGramatica(){
     }
 }
 
-void GLC::imprimirArquivoSaida(){
-    for (const auto& linhaVariavel : glcHash) {
-        fncArquivo << linhaVariavel.first << " -> ";
-        for (size_t i = 0; i < linhaVariavel.second.size(); i++) {
-            fncArquivo << linhaVariavel.second[i];
-            if (i < linhaVariavel.second.size() - 1) {
+void GLC::imprimirArquivoSaida() {
+    std::vector<std::string> vetHashOrdenada;
+
+    // Busca S' e S, para colocar na frente do vetor
+    if (glcHash.find("S'") != glcHash.end()) vetHashOrdenada.push_back("S'");
+    if (glcHash.find("S") != glcHash.end()) vetHashOrdenada.push_back("S");
+
+    // Coloca as variáveis em ordem alfabética
+    for (char ch = 'A'; ch <= 'Z'; ch++) {
+        std::string letra(1, ch);
+        if (glcHash.find(letra) != glcHash.end() && letra != "S") 
+            vetHashOrdenada.push_back(letra);
+    }
+
+    // Coloca as variáveis ' em ordem alfabética
+    for (char ch = 'A'; ch <= 'Z'; ++ch) {
+        std::string letra(1, ch);
+        letra += "'";
+        if (glcHash.find(letra) != glcHash.end() && letra != "S'") 
+            vetHashOrdenada.push_back(letra);
+    }
+
+    // Coloca os Tn em ordem numérica
+    for (int i = 1; ; ++i) {
+        std::string temps = "T" + std::to_string(i);
+        if (glcHash.find(temps) != glcHash.end()) {
+            vetHashOrdenada.push_back(temps);
+        } else {
+            break;  // Para quando não houver mais chaves no formato "Tn"
+        }
+    }
+
+    // Imprime o vetor vetHashOrdenada
+    for (const auto& variavel : vetHashOrdenada) {
+        fncArquivo << variavel << " -> ";
+        const auto& regras = glcHash[variavel];
+        for (size_t i = 0; i < regras.size(); ++i) {
+            fncArquivo << regras[i];
+            if (i < regras.size() - 1) {
                 fncArquivo << " | ";
             }
         }
