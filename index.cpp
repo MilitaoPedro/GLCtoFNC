@@ -588,7 +588,7 @@ void GLC::imprimirArquivoSaida() {
         }
     }
 
-    // Imprime o vetor vetHashOrdenada
+    // Imprime o vetor vetHashOrdenada no arquivo de saída
     for (const auto& variavel : vetHashOrdenada) {
         fncArquivo << variavel << " -> ";
         const auto& regras = glcHash[variavel];
