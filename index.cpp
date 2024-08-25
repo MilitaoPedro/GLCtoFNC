@@ -34,6 +34,8 @@ class GLC{
             const std::string& varAtual
         );
         void removeChainRules();
+        void term();
+        void reach();
         GLC(const std::string& nomeArquivoGNC);
 };
     GLC::GLC(const std::string& nomeArquivoGNC){
@@ -47,9 +49,10 @@ class GLC{
         }
 
         lerGramatica();
-        // removeRecursividadeS();
-        // removeLambda();
+        removeRecursividadeS();
+        removeLambda();
         removeChainRules();
+        term();
         glcArquivo.close();
     }
 
@@ -173,8 +176,6 @@ class GLC{
             // Converter o conjunto de volta para um vetor
             linhaVariavel.second.assign(regraAtualizadasSet.begin(), regraAtualizadasSet.end());
         }
-
-        imprimirGramatica();
     }
 
     void GLC::combinacoesSemAnulavel(const std::string& regra, const std::set<std::string>& nullables, std::set<std::string>& regraAtualizadas, const std::string& varAtual) {
@@ -190,7 +191,7 @@ class GLC{
         novasRegras.insert(regra);
 
         // Para cada posição na regra, verifique se é anulável e crie novas regras removendo-a
-        for (size_t i = 0; i < n; ++i) {
+        for (size_t i = 0; i < n; i++) {
             std::string symbol(1, regra[i]);
             if (nullables.find(symbol) != nullables.end()) {
                 std::set<std::string> tempRegras;
@@ -224,8 +225,8 @@ class GLC{
     }
 
     void GLC::removeChainRules() {
-        for (auto& entry : glcHash) {
-            const std::string& variavel = entry.first;
+        for (auto& linhaVariavel : glcHash) {
+            const std::string& variavel = linhaVariavel.first;
             std::set<std::string> visitados;
             std::set<std::string> novasRegras; // Usar set para evitar duplicatas
 
@@ -244,7 +245,7 @@ class GLC{
                 for (const auto& regra : glcHash[atual]) {
                     if (regra.size() == 1 && isupper(regra[0])) {
                         fila.push_back(regra);
-                    } else if(regra.empty() && entry.first == "S"){ // Não adicionar regras vazias ou lambda
+                    } else if(regra.empty() && linhaVariavel.first == "S"){ // Não adicionar regras vazias ou lambda
                         novasRegras.insert(".");
                     } else if (!regra.empty()) {
                         novasRegras.insert(regra);
@@ -253,18 +254,94 @@ class GLC{
             }
 
             // Atualizar as regras da variável com as novas regras sem duplicatas
-            entry.second.assign(novasRegras.begin(), novasRegras.end());
+            linhaVariavel.second.assign(novasRegras.begin(), novasRegras.end());
         }
+    }
+
+    void GLC::term() {
+        std::set<std::string> uteis;
+        bool mudou;
+
+        do {
+            mudou = false;
+            for (const auto& linhaVariavel : glcHash) {
+                const std::string& variavel = linhaVariavel.first;
+                for (const auto& regra : linhaVariavel.second) {
+                    bool regraGeradora = true;
+                    for (char simbolo : regra) {
+                        std::string stringSimbolo(1, simbolo);
+                        if (!islower(simbolo) && uteis.find(stringSimbolo) == uteis.end()) {
+                            regraGeradora = false;
+                            break;
+                        }
+                    }
+                    if (regraGeradora && uteis.find(variavel) == uteis.end()) {
+                        uteis.insert(variavel);
+                        mudou = true;
+                    }
+                }
+            }
+        } while (mudou);
+
+        for (auto it = glcHash.begin(); it != glcHash.end(); ) {
+            if (uteis.find(it->first) == uteis.end()) {
+                it = glcHash.erase(it);
+            } else {
+                auto& regras = it->second;
+                regras.erase(std::remove_if(regras.begin(), regras.end(), [&uteis](const std::string& regra) {
+                    return std::any_of(regra.begin(), regra.end(), [&uteis](char simbolo) {
+                        return isupper(simbolo) && uteis.find(std::string(1, simbolo)) == uteis.end();
+                    });
+                }), regras.end());
+                it++;
+            }
+        }
+        
+        imprimirGramatica();
+
+        reach();
+    }
+
+    void GLC::reach() {
+        std::set<std::string> acessiveis;
+        std::vector<std::string> fila = {"S"};
+        acessiveis.insert("S");
+
+        while (!fila.empty()) {
+            std::string atual = fila.back();
+            fila.pop_back();
+
+            for (const auto& regra : glcHash[atual]) {
+                for (char simbolo : regra) {
+                    std::string stringSimbolo(1, simbolo);
+                    if (isupper(simbolo) && acessiveis.find(stringSimbolo) == acessiveis.end()) {
+                        acessiveis.insert(stringSimbolo);
+                        fila.push_back(stringSimbolo);
+                    }
+                }
+            }
+        }
+
+        for (auto it = glcHash.begin(); it != glcHash.end(); ) {
+            if (acessiveis.find(it->first) == acessiveis.end()) {
+                it = glcHash.erase(it);
+            } else {
+                ++it;
+            }
+        }
+        std::cout << "\n\n";
         imprimirGramatica();
     }
 
+    
+
     void GLC::imprimirGramatica(){
          // Exibe todas as regras da gramática
-        for (const auto& entry : glcHash) {
-            std::cout << entry.first << " -> ";
-            for (size_t i = 0; i < entry.second.size(); ++i) {
-                std::cout << entry.second[i];
-                if (i < entry.second.size() - 1) {
+        for (const auto& linhaVariavel : glcHash) {
+            std::cout << linhaVariavel.first << " -> ";
+            for (size_t i = 0; i < linhaVariavel.second.size(); i++) {
+                std::cout << linhaVariavel.second[i];
+                if (i < linhaVariavel.second.size() - 1) {
                     std::cout << " | ";
                 }
             }

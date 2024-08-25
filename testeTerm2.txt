@@ -1,0 +1,6 @@
+S -> aB | aA | bcC
+A -> aA | ABA
+B -> bB | b
+C -> cC | BEA
+D -> aE | bEc | d
+E -> cD | cEb
