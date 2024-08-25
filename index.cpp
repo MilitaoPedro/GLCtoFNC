@@ -24,15 +24,16 @@ class GLC{
             const std::string& regra
         );
         void lerGramatica();
-        void removeRecursividadeS();
+        std::string removeRecursividadeS();
         void imprimirGramatica();
-        void removeLambda();
+        void removeLambda(const std::string& inicial);
         void combinacoesSemAnulavel
         (
             const std::string& regra, 
             const std::set<std::string>& nullables, 
             std::set<std::string>& regraAtualizadas,
-            const std::string& varAtual
+            const std::string& varAtual,
+            const std::string& inicial
         );
         void removeChainRules();
         void term();
@@ -41,26 +42,38 @@ class GLC{
         void substituirTerminais();
         void dividirRegras();
         void renomeiaTs(const int& qntdTs);
+        void imprimirArquivoSaida();
 
-        GLC(const std::string& nomeArquivoGNC);
+        GLC(const std::string& nomeArquivoGNC, const std::string& nomeArquivoFNC);
 
 };
-GLC::GLC(const std::string& nomeArquivoGNC){
+GLC::GLC(const std::string& nomeArquivoGNC, const std::string& nomeArquivoFNC){
     glcArquivo.open(nomeArquivoGNC);
 
     if(glcArquivo.fail()){
-        /* Começar execução */
         std::cout << "Arquivo não encontrado";
         glcArquivo.close();
         return;
     }
 
     lerGramatica();
-    removeRecursividadeS();
-    removeLambda();
+    removeLambda(removeRecursividadeS());
     removeChainRules();
     term();
     transformarParaFNC();
+
+    fncArquivo.open(nomeArquivoFNC);
+
+    if(fncArquivo.fail()){
+        std::cout << "Ocorreu um erro ao criar o arquivo de saída";
+        fncArquivo.close();
+        return;
+    }
+
+    imprimirArquivoSaida();
+
+    // Fecha os arquivos de entrada e saída
+    fncArquivo.close();
     glcArquivo.close();
 }
 
@@ -104,12 +117,11 @@ void GLC::lerGramatica(){
     }
 }
 
-void GLC::removeRecursividadeS() {
+std::string GLC::removeRecursividadeS() {
     bool regraS = false;
     for (const auto& linhaVariavel : glcHash) {
         for (const auto& regra : linhaVariavel.second) {
-            if ((regra.find("S") != std::string::npos) && (linhaVariavel.first != "S")) {
-                std::cout << "Regra S: " << regra << " " << (regra.find("S") == std::string::npos) << '\n';
+            if ((regra.find("S") != std::string::npos)) {
                 regraS = true;
                 break;
             }
@@ -117,12 +129,17 @@ void GLC::removeRecursividadeS() {
         if (regraS) break;
     }
 
+    std::string inicial = "S";
+
     if (regraS) {
         adicionarRegra("S'", "S");
+        inicial = "S'";
     }
+    
+    return inicial;
 }
 
-void GLC::removeLambda() {
+void GLC::removeLambda(const std::string& inicial) {
 
     // Set permite apenas elementos únicos
     // Busca O(log n) vs O(n) do Vector
@@ -179,29 +196,36 @@ void GLC::removeLambda() {
     for (auto& linhaVariavel : glcHash) {
         std::set<std::string> regraAtualizadasSet;
         for (const auto& regra : linhaVariavel.second) {
-            combinacoesSemAnulavel(regra, nullables, regraAtualizadasSet, linhaVariavel.first);
+            combinacoesSemAnulavel(regra, nullables, regraAtualizadasSet, linhaVariavel.first, inicial);
         }
         // Converter o conjunto de volta para um vetor
         linhaVariavel.second.assign(regraAtualizadasSet.begin(), regraAtualizadasSet.end());
     }
+    std::cout << "\n\nGramatica apos remove Lambda: \n";
+    imprimirGramatica();
+    std::cout << "\n";
 }
 
-void GLC::combinacoesSemAnulavel(const std::string& regra, const std::set<std::string>& nullables, std::set<std::string>& regraAtualizadas, const std::string& varAtual) {
+void GLC::combinacoesSemAnulavel(const std::string& regra, 
+                                const std::set<std::string>& nullables, 
+                                std::set<std::string>& regraAtualizadas, 
+                                const std::string& varAtual,
+                                const std::string& inicial
+                                ) {
     size_t n = regra.size();
     std::set<std::string> novasRegras;
 
-    // Se a regra é apenas ".", não adiciona nada
-    if (regra == "." && varAtual != "S") {
+    if (regra == "." && varAtual != inicial) 
         return;
-    }
 
     // Comece com a regra original
     novasRegras.insert(regra);
 
     // Para cada posição na regra, verifique se é anulável e crie novas regras removendo-a
     for (size_t i = 0; i < n; i++) {
-        std::string symbol(1, regra[i]);
-        if (nullables.find(symbol) != nullables.end()) {
+        std::string simbolo(1, regra[i]);
+        // Verificando se o símbolo da regra naposição i pode ser encontrado em nullables
+        if (nullables.find(simbolo) != nullables.end()) {
             std::set<std::string> tempRegras;
             for (const auto& r : novasRegras) {
                 // Certifique-se de que estamos dentro dos limites da string
@@ -209,8 +233,8 @@ void GLC::combinacoesSemAnulavel(const std::string& regra, const std::set<std::s
                 if (i + 1 < r.size()) {
                     novaRegra += r.substr(i + 1);
                 }
-                // Adiciona a nova regra, mesmo se estiver vazia
-                if (r.empty() && varAtual == "S") {
+
+                if ((r.empty() || r == ".") && varAtual == inicial) {
                     novasRegras.insert("."); // Adiciona a regra vazia representada por "." apenas se for a variável inicial
                 }
                 tempRegras.insert(novaRegra);
@@ -222,7 +246,9 @@ void GLC::combinacoesSemAnulavel(const std::string& regra, const std::set<std::s
 
     // Adicione todas as novas regras geradas ao conjunto para eliminar duplicações
     for (const auto& regra : novasRegras) {
-        if(!regra.empty()) 
+        if(varAtual == inicial && regra.empty())
+            regraAtualizadas.insert(".");
+        else if (!regra.empty()) 
             regraAtualizadas.insert(regra);
     }
 
@@ -264,6 +290,9 @@ void GLC::removeChainRules() {
         // Atualizar as regras da variável com as novas regras sem duplicatas
         linhaVariavel.second.assign(novasRegras.begin(), novasRegras.end());
     }
+    std::cout << "\n\nGramatica apos remove chain Rules: \n";
+    imprimirGramatica();
+    std::cout << "\n";
 }
 
 void GLC::term() {
@@ -305,7 +334,9 @@ void GLC::term() {
         }
     }
     
+    std::cout << "\n\nGramatica apos Term: \n";
     imprimirGramatica();
+    std::cout << "\n";
 
     reach();
 }
@@ -313,6 +344,11 @@ void GLC::term() {
 void GLC::reach() {
     std::set<std::string> acessiveis;
     std::vector<std::string> fila = {"S"};
+
+    // Checa se existe S' e adiciona-o aos acessiveis
+    if(glcHash.find("S'") != glcHash.end())
+        acessiveis.insert("S'");
+
     acessiveis.insert("S");
 
     while (!fila.empty()) {
@@ -337,24 +373,9 @@ void GLC::reach() {
             ++it;
         }
     }
-    std::cout << "\n\n";
+    std::cout << "\n\nGramatica apos Reach: \n";
     imprimirGramatica();
-}
-
-
-
-void GLC::imprimirGramatica(){
-        // Exibe todas as regras da gramática
-    for (const auto& linhaVariavel : glcHash) {
-        std::cout << linhaVariavel.first << " -> ";
-        for (size_t i = 0; i < linhaVariavel.second.size(); i++) {
-            std::cout << linhaVariavel.second[i];
-            if (i < linhaVariavel.second.size() - 1) {
-                std::cout << " | ";
-            }
-        }
-        std::cout << std::endl;
-    }
+    std::cout << "\n";
 }
 
 void GLC::transformarParaFNC() {
@@ -388,7 +409,7 @@ void GLC::substituirTerminais() {
                             char terminalUppercase = regra[i];
                             std::cout << "terminalUppercase {" << terminalUppercase << "}\n\n";
                             terminalUppercase = toupper(terminalUppercase);
-                            std::cout << "terminalUppercase após toupper {" << terminalUppercase << "}\n\n";
+                            std::cout << "terminalUppercase apos toupper {" << terminalUppercase << "}\n\n";
 
                             std::string novoSimbolo = std::string(1, terminalUppercase) + "'";
 
@@ -411,6 +432,8 @@ void GLC::substituirTerminais() {
 void GLC::dividirRegras() {
     std::unordered_map<std::string, std::vector<std::string>> novasRegras;  // Para armazenar as novas regras geradas
     int contadorTemporario = 1;  // Contador para criar nomes únicos para variáveis temporárias
+
+    std::unordered_map<std::string, std::string> novasRegrasT; // Regras Temporárias
 
     for (auto& linhaVariavel : glcHash) {
         const std::string& variavel = linhaVariavel.first;
@@ -440,13 +463,28 @@ void GLC::dividirRegras() {
                     std::string penultimoSimbolo = simbolos.back();
                     simbolos.pop_back();
 
-                    // Cria a variável Tn para os símbolos retirados
-                    std::string novoLHS = "T" + std::to_string(contadorTemporario++);
+                    bool jaExiste = false;
 
-                    // Cria uma linha com o simbolo Tn e os dois ultimos simbolos
-                    novasRegras[novoLHS].push_back(penultimoSimbolo + ultimoSimbolo);
+                    for (const auto& regraT : novasRegrasT) {
+                        if(regraT.second == penultimoSimbolo + ultimoSimbolo)
+                            // Adiciona a variável T (já existente) a simbolos
+                            simbolos.push_back(regraT.first);
+                            jaExiste = true;
+                            break;
+                    }
 
-                    simbolos.push_back(novoLHS);
+                    if(!jaExiste){
+                        // Cria a variável Tn para os símbolos retirados
+                        std::string novoLHS = "T" + std::to_string(contadorTemporario++);
+
+                        // Cria uma linha com o simbolo Tn e os dois ultimos simbolos
+                        novasRegras[novoLHS].push_back(penultimoSimbolo + ultimoSimbolo);
+
+                        // Cria uma linha para as variáveis T
+                        novasRegrasT[novoLHS].append(penultimoSimbolo + ultimoSimbolo);
+
+                        simbolos.push_back(novoLHS);
+                    }
                 }
 
                 std::cout << "\nSimbolos da Regra " << atualLHS << " {";
@@ -479,6 +517,7 @@ void GLC::renomeiaTs(const int& qntdTs){
     std::regex tRegex("T(\\d+)");
 
     std::unordered_map<std::string, std::vector<std::string>> novasRegras;
+    
     for (const auto& linhaVariavel : glcHash) {
         std::string novaVariavel = linhaVariavel.first;
         if (novaVariavel[0] == 'T') {
@@ -503,6 +542,33 @@ void GLC::renomeiaTs(const int& qntdTs){
     glcHash = novasRegras;
 }
 
+void GLC::imprimirGramatica(){
+    // Exibe todas as regras da gramática
+    for (const auto& linhaVariavel : glcHash) {
+        std::cout << linhaVariavel.first << " -> ";
+        for (size_t i = 0; i < linhaVariavel.second.size(); i++) {
+            std::cout << linhaVariavel.second[i];
+            if (i < linhaVariavel.second.size() - 1) {
+                std::cout << " | ";
+            }
+        }
+        std::cout << std::endl;
+    }
+}
+
+void GLC::imprimirArquivoSaida(){
+    for (const auto& linhaVariavel : glcHash) {
+        fncArquivo << linhaVariavel.first << " -> ";
+        for (size_t i = 0; i < linhaVariavel.second.size(); i++) {
+            fncArquivo << linhaVariavel.second[i];
+            if (i < linhaVariavel.second.size() - 1) {
+                fncArquivo << " | ";
+            }
+        }
+        fncArquivo << '\n';
+    }
+}
+
 int main(){
 
     // Pega o arquivo de entrada
@@ -510,10 +576,10 @@ int main(){
     std::cin >> nomeArquivoEntrada;
 
     // Pega o arquivo de saída
-    // std::string nomeArquivoSaida;
-    // std::cin >> nomeArquivoSaida;
+    std::string nomeArquivoSaida;
+    std::cin >> nomeArquivoSaida;
     
-    GLC glc(nomeArquivoEntrada);
+    GLC glc(nomeArquivoEntrada, nomeArquivoSaida);
 
     return 0;
 }

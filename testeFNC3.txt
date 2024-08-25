@@ -1,1 +1,1 @@
-A -> A'B' | A'BCD | a
+S -> S'B' | S'BCD | a
