@@ -252,7 +252,7 @@ void GLC::combinacoesSemAnulavel(const std::string& regra,
             regraAtualizadas.insert(regra);
     }
 
-    // Para depuração, imprimir todas as regras geradas
+    // Imprime todas as regras geradas
     for (const auto& r : regraAtualizadas) {
         std::cout << " -> " << r;
     }
