@@ -8,6 +8,7 @@
 #include <cctype>
 #include <regex>
 
+
 class GLC{
     private: 
         // Tabela Hash que associa as variáveis (char) a suas regras (vetor de strings)
@@ -16,6 +17,8 @@ class GLC{
         std::ifstream glcArquivo;
         // Arquivo de saída
         std::ofstream fncArquivo;
+        // Símbolo inicial
+        std::string inicial = "S";
 
     public: 
         void adicionarRegra
@@ -26,14 +29,13 @@ class GLC{
         void lerGramatica();
         std::string removeRecursividadeS();
         void imprimirGramatica();
-        void removeLambda(const std::string& inicial);
+        void removeLambda();
         void combinacoesSemAnulavel
         (
             const std::string& regra, 
             const std::set<std::string>& nullables, 
             std::set<std::string>& regraAtualizadas,
-            const std::string& varAtual,
-            const std::string& inicial
+            const std::string& varAtual
         );
         void removeChainRules();
         void term();
@@ -42,11 +44,13 @@ class GLC{
         void substituirTerminais();
         void dividirRegras();
         void renomeiaTs(const int& qntdTs);
-        void imprimirArquivoSaida();
+        void vetOrdenaGramatica(std::vector<std::string>& vetHashOrdenada);
+        void imprimirArquivoSaida(const std::string& nomeArquivoFNC);
 
         GLC(const std::string& nomeArquivoGNC, const std::string& nomeArquivoFNC);
 
 };
+
 GLC::GLC(const std::string& nomeArquivoGNC, const std::string& nomeArquivoFNC){
     glcArquivo.open(nomeArquivoGNC);
 
@@ -55,26 +59,6 @@ GLC::GLC(const std::string& nomeArquivoGNC, const std::string& nomeArquivoFNC){
         glcArquivo.close();
         return;
     }
-
-    lerGramatica();
-    removeLambda(removeRecursividadeS());
-    removeChainRules();
-    term();
-    transformarParaFNC();
-
-    fncArquivo.open(nomeArquivoFNC);
-
-    if(fncArquivo.fail()){
-        std::cout << "Ocorreu um erro ao criar o arquivo de saída";
-        fncArquivo.close();
-        return;
-    }
-
-    imprimirArquivoSaida();
-
-    // Fecha os arquivos de entrada e saída
-    fncArquivo.close();
-    glcArquivo.close();
 }
 
 void GLC::adicionarRegra(const std::string& variavel, const std::string& regra){
@@ -115,6 +99,9 @@ void GLC::lerGramatica(){
             adicionarRegra(variavel, regra);
         }
     }
+
+    // Fecha o arquivo de entrada que já foi lidos
+    glcArquivo.close();
 }
 
 std::string GLC::removeRecursividadeS() {
@@ -129,17 +116,16 @@ std::string GLC::removeRecursividadeS() {
         if (regraS) break;
     }
 
-    std::string inicial = "S";
-
     if (regraS) {
         adicionarRegra("S'", "S");
         inicial = "S'";
+        return inicial;
     }
     
     return inicial;
 }
 
-void GLC::removeLambda(const std::string& inicial) {
+void GLC::removeLambda() {
 
     // Set permite apenas elementos únicos
     // Busca O(log n) vs O(n) do Vector
@@ -196,7 +182,7 @@ void GLC::removeLambda(const std::string& inicial) {
     for (auto& linhaVariavel : glcHash) {
         std::set<std::string> regraAtualizadasSet;
         for (const auto& regra : linhaVariavel.second) {
-            combinacoesSemAnulavel(regra, nullables, regraAtualizadasSet, linhaVariavel.first, inicial);
+            combinacoesSemAnulavel(regra, nullables, regraAtualizadasSet, linhaVariavel.first);
         }
         // Converter o conjunto de volta para um vetor
         linhaVariavel.second.assign(regraAtualizadasSet.begin(), regraAtualizadasSet.end());
@@ -209,8 +195,7 @@ void GLC::removeLambda(const std::string& inicial) {
 void GLC::combinacoesSemAnulavel(const std::string& regra, 
                                 const std::set<std::string>& nullables, 
                                 std::set<std::string>& regraAtualizadas, 
-                                const std::string& varAtual,
-                                const std::string& inicial
+                                const std::string& varAtual
                                 ) {
     size_t n = regra.size();
     std::set<std::string> novasRegras;
@@ -252,7 +237,7 @@ void GLC::combinacoesSemAnulavel(const std::string& regra,
             regraAtualizadas.insert(regra);
     }
 
-    // Imprime todas as regras geradas
+    // Para depuração, imprimir todas as regras geradas
     for (const auto& r : regraAtualizadas) {
         std::cout << " -> " << r;
     }
@@ -337,19 +322,14 @@ void GLC::term() {
     std::cout << "\n\nGramatica apos Term: \n";
     imprimirGramatica();
     std::cout << "\n";
-
-    reach();
 }
 
 void GLC::reach() {
     std::set<std::string> acessiveis;
-    std::vector<std::string> fila = {"S"};
+    std::vector<std::string> fila = {inicial};
 
-    // Checa se existe S' e adiciona-o aos acessiveis
-    if(glcHash.find("S'") != glcHash.end())
-        acessiveis.insert("S'");
-
-    acessiveis.insert("S");
+    // Adiciona a o símbolo inicial aos acessiveis
+    acessiveis.insert(inicial);
 
     while (!fila.empty()) {
         std::string regra = fila.back();
@@ -381,7 +361,6 @@ void GLC::reach() {
 void GLC::transformarParaFNC() {
     substituirTerminais();
     imprimirGramatica();  // Passo 1: Substituir terminais
-    // dividirRegrasLongas();
     std::cout << "\n\nPASSO 2: "; // Passo 2: Dividir regras longas
     dividirRegras();
     imprimirGramatica(); 
@@ -556,9 +535,8 @@ void GLC::imprimirGramatica(){
     }
 }
 
-void GLC::imprimirArquivoSaida() {
-    std::vector<std::string> vetHashOrdenada;
-
+// Ordena a gramática que está na unordered_map
+void GLC::vetOrdenaGramatica(std::vector<std::string>& vetHashOrdenada){
     // Busca S' e S, para colocar na frente do vetor
     if (glcHash.find("S'") != glcHash.end()) vetHashOrdenada.push_back("S'");
     if (glcHash.find("S") != glcHash.end()) vetHashOrdenada.push_back("S");
@@ -587,8 +565,22 @@ void GLC::imprimirArquivoSaida() {
             break;  // Para quando não houver mais chaves no formato "Tn"
         }
     }
+}
 
-    // Imprime o vetor vetHashOrdenada no arquivo de saída
+void GLC::imprimirArquivoSaida(const std::string& nomeArquivoFNC) {
+
+    fncArquivo.open(nomeArquivoFNC);
+
+    if(fncArquivo.fail()){
+        std::cout << "Ocorreu um erro ao criar o arquivo de saída";
+        fncArquivo.close();
+        return;
+    }
+
+    std::vector<std::string> vetHashOrdenada;
+    vetOrdenaGramatica(vetHashOrdenada);
+
+    // Imprime a gramática ordenada
     for (const auto& variavel : vetHashOrdenada) {
         fncArquivo << variavel << " -> ";
         const auto& regras = glcHash[variavel];
@@ -598,21 +590,43 @@ void GLC::imprimirArquivoSaida() {
                 fncArquivo << " | ";
             }
         }
-        fncArquivo << '\n';
+        if(variavel != vetHashOrdenada.back())
+            fncArquivo << '\n';
     }
+
+    // Fecha os arquivos de saída
+    fncArquivo.close();
 }
 
-int main(){
+int main(int argc, char* argv[]) {
+    // Verifica se o número de argumentos está correto
+    if (argc != 3) {
+        std::cerr << "Uso: " << argv[0] << " <nomeArquivoEntrada> <nomeArquivoSaida>\n";
+        return 1;
+    }
 
-    // Pega o arquivo de entrada
-    std::string nomeArquivoEntrada;
-    std::cin >> nomeArquivoEntrada;
+    // Pega os nomes dos arquivos de entrada e saída da linha de comando
+    std::string nomeArquivoEntrada = argv[1];
+    std::string nomeArquivoSaida = argv[2];
 
-    // Pega o arquivo de saída
-    std::string nomeArquivoSaida;
-    std::cin >> nomeArquivoSaida;
-    
     GLC glc(nomeArquivoEntrada, nomeArquivoSaida);
+
+    // Lê a gramatica presente no arquivo de entrada
+    glc.lerGramatica();
+    // Remove a recursividade de S (Símbolo inicial)
+    glc.removeRecursividadeS();
+    // Remove regras Lambda fora do símbolo inicial
+    glc.removeLambda();
+    // Remove as regras da cadeira (Ex: A -> B)
+    glc.removeChainRules();
+    // Remove as variáveis que não geram terminais
+    glc.term();
+    // Remove as variáveis inalcançaveis
+    glc.reach();
+    // Realiza as últimas etapas para a passagem de GLC para FNC
+    glc.transformarParaFNC();
+    // Imprime a gramática no arquivo de saída
+    glc.imprimirArquivoSaida(nomeArquivoSaida);
 
     return 0;
 }
