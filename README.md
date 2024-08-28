@@ -13,7 +13,8 @@ Aplicativo desenvolvido em C++, que recebe como entrada um arquivo texto com uma
 
 ## Chamada da função
 A chamada é feita por linha de comando:
-./nomeArquivoExecutavel <nomeArquivoEntrada> <nomeArquivoSaida>
+./nomeArquivoExecutavel "<nomeArquivoEntrada>" "<nomeArquivoSaida>"
+
 ```> ./glc2fnc glc1.txt glc1fnc.txt```
 
 ## Exemplo de entrada e saída
