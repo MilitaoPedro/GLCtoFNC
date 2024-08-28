@@ -5,7 +5,7 @@ Aplicativo desenvolvido em C++, que recebe como entrada um arquivo texto com uma
 - Variáveis: [A-Z]
 - Variáveis criadas pelo algoritmo: 
   - X (x sendo o terminal da linguagem que a variável criada gera)
-  - T<sub>n<sub> (∀n ∈ N}) (variáveis criadas na etapa final da passagem para Chomsky)
+  - T<sub>n</sub> (∀n ∈ N}) (variáveis criadas na etapa final da passagem para Chomsky)
 - Terminais: [a-z]
 - Operador de definição: ->
 - Separador de regras: | (ou quebra de linha)
@@ -13,7 +13,7 @@ Aplicativo desenvolvido em C++, que recebe como entrada um arquivo texto com uma
 
 ## Chamada da função
 A chamada é feita por linha de comando:
-./nomeArquivoExecutavel "<nomeArquivoEntrada>" "<nomeArquivoSaida>"
+./nomeArquivoExecutavel nomeArquivoEntrada.txt nomeArquivoSaida.txt
 
 ```> ./glc2fnc glc1.txt glc1fnc.txt```
 
