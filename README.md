@@ -2,15 +2,14 @@
 Aplicativo desenvolvido em C++, que recebe como entrada um arquivo texto com uma GLC (Gramática Livre de Contexto) G’ e provém como saída um arquivo texto com a GLC G” na FNC (Forma normal de Chomsky) equivalente à G’.
 
 ## Padrões utilizados para as produções
-– Variáveis: [A-Z]
+- Variáveis: [A-Z]
 - Variáveis criadas pelo algoritmo: 
   - X (x sendo o terminal da linguagem que a variável criada gera)
   - T<sub>n<sub> (∀n ∈ N}) (variáveis criadas na etapa final da passagem para Chomsky)
-
-– Terminais: [a-z]
-– Operador de definição: ->
-– Separador de regras: | (ou quebra de linha)
-– Lambda: .
+- Terminais: [a-z]
+- Operador de definição: ->
+- Separador de regras: | (ou quebra de linha)
+- Lambda: .
 
 ## Chamada da função
 A chamada é feita por linha de comando:
